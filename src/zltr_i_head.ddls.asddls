@@ -7,7 +7,7 @@
   sizeCategory: #S,
   dataClass: #MIXED
 }
-define view entity ZLTR_I_Head
+define root view entity ZLTR_I_Head
   as select from zltr_head
      composition [0..1] of ZLTR_I_Content as _Content
 {

@@ -1,0 +1,5 @@
+@EndUserText.label: 'Service Definition for LTR'
+define service ZSD_LTR {
+  expose ZLTR_C_Head    as Head;
+  expose ZLTR_C_Content as Content;
+}

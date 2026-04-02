@@ -1,0 +1,49 @@
+unmanaged implementation in class ZCL_LTR_HEADER_IMPL unique;
+strict ( 2 );
+
+define behavior for ZLTR_I_Head
+lock master
+authorization master ( global )
+etag master ChangedAt
+{
+  field ( readonly ) UUID, CreatedBy, CreatedAt, ChangedBy, ChangedAt;
+  field ( mandatory ) ObjectType, ObjectKey, TextType;
+
+  create;
+  update;
+  delete;
+
+  association _Content { create; }
+
+  mapping for zltr_head
+  {
+    UUID        = uuid;
+    ObjectType  = object_type;
+    ObjectKey   = object_key;
+    TextType    = text_type;
+    Language    = language;
+    CreatedBy   = created_by;
+    CreatedAt   = created_at;
+    ChangedBy   = changed_by;
+    ChangedAt   = changed_at;
+  }
+}
+
+define behavior for ZLTR_I_Content
+lock dependent by _Header
+authorization dependent by _Header
+{
+  field ( readonly ) UUID;
+
+  update;
+  delete;
+
+  mapping for zltr_content
+  {
+    UUID            = uuid;
+    ShortText       = short_text;
+    LongText        = long_text;
+    length          = length;
+  }
+  association _Header;
+}

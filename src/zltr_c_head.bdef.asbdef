@@ -1,0 +1,19 @@
+projection;
+strict ( 2 );
+
+define behavior for ZLTR_C_Head alias Head
+{
+  use create;
+  use update;
+  use delete;
+
+  use association _Content { create; }
+}
+
+define behavior for ZLTR_C_Content alias Content
+{
+  use update;
+  use delete;
+
+  use association _Header;
+}

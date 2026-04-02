@@ -1,15 +1,5 @@
-class ZCL_LTR_HEADER_IMPL definition
-  public
-  abstract
-  final
-  create public .
-
-public section.
-protected section.
-private section.
+CLASS zcl_ltr_header_impl DEFINITION PUBLIC ABSTRACT FINAL FOR BEHAVIOR OF zltr_i_head.
 ENDCLASS.
 
-
-
-CLASS ZCL_LTR_HEADER_IMPL IMPLEMENTATION.
+CLASS zcl_ltr_header_impl IMPLEMENTATION.
 ENDCLASS.

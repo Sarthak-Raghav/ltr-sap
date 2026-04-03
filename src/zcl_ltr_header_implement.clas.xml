@@ -3,7 +3,7 @@
  <asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0">
   <asx:values>
    <VSEOCLASS>
-    <CLSNAME>ZCL_LTR_HEADER_IMPL</CLSNAME>
+    <CLSNAME>ZCL_LTR_HEADER_IMPLEMENT</CLSNAME>
     <LANGU>E</LANGU>
     <DESCRIPT>Behavior Implementation for ZLTR_I_HEAD</DESCRIPT>
     <CATEGORY>06</CATEGORY>

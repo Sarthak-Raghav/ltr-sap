@@ -1,4 +1,5 @@
 @AbapCatalog.viewEnhancementCategory: [#NONE]
+@AccessControl.authorizationCheck: #NOT_REQUIRED
 @EndUserText.label: 'LTR - Content Consumption View'
 @Metadata.allowExtensions: true
 @Metadata.ignorePropagatedAnnotations: true

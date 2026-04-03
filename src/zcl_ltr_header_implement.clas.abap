@@ -1,0 +1,5 @@
+CLASS zcl_ltr_header_implement DEFINITION PUBLIC ABSTRACT FINAL FOR BEHAVIOR OF zltr_i_head.
+ENDCLASS.
+
+CLASS zcl_ltr_header_implement IMPLEMENTATION.
+ENDCLASS.

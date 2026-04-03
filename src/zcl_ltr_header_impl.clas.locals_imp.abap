@@ -218,10 +218,52 @@ ENDMETHOD.
   ENDMETHOD.
 
   METHOD rba_Content.
-  ENDMETHOD.
+  LOOP AT keys_rba ASSIGNING FIELD-SYMBOL(<key>).
+    SELECT SINGLE
+      uuid,
+      short_text,
+      long_text,
+      length
+    FROM zltr_content
+    WHERE uuid   = @<key>-uuid
+    INTO @DATA(ls_content).
+
+    IF sy-subrc <> 0.
+      CONTINUE.
+    ENDIF.
+
+    APPEND VALUE #(
+      uuid           = ls_content-uuid
+      shorttext      = ls_content-short_text
+      longtext       = ls_content-long_text
+      length         = ls_content-length
+    ) TO result.
+
+    APPEND VALUE #(
+      source-%tky = <key>-%tky
+      target-%tky = VALUE #( uuid = ls_content-uuid )
+    ) TO association_links.
+  ENDLOOP.
+ENDMETHOD.
 
   METHOD cba_Content.
-  ENDMETHOD.
+  LOOP AT entities_cba ASSIGNING FIELD-SYMBOL(<entity>).
+
+    LOOP AT <entity>-%target ASSIGNING FIELD-SYMBOL(<target>).
+      DATA ls_content TYPE zltr_content.
+      ls_content-client         = sy-mandt.
+      ls_content-uuid           = <entity>-uuid.
+      ls_content-short_text     = <target>-shorttext.
+      ls_content-long_text      = <target>-longtext.
+      ls_content-length = xstrlen( <target>-longtext ).
+
+      APPEND ls_content TO lcl_buffer=>mt_content_create.
+
+      APPEND VALUE #(  %cid = <target>-%cid
+                       %tky     = VALUE #( uuid = <entity>-uuid ) ) TO mapped-zltr_i_content.
+    ENDLOOP.
+ ENDLOOP.
+ENDMETHOD.
 
 ENDCLASS.
 
@@ -245,17 +287,125 @@ ENDCLASS.
 CLASS lhc_ZLTR_I_Content IMPLEMENTATION.
 
   METHOD update.
+  LOOP AT entities ASSIGNING FIELD-SYMBOL(<entity>).
+
+    SELECT SINGLE uuid,
+                  short_text,
+                  long_text,
+                  length FROM zltr_content
+                         WHERE uuid   = @<entity>-uuid
+                         INTO @DATA(ls_content).
+    IF sy-subrc <> 0.
+      APPEND VALUE #(
+        %tky = <entity>-%tky
+        %msg = new_message_with_text(
+                 severity = if_abap_behv_message=>severity-error
+                 text     = 'Content record not found for update' )
+      ) TO reported-zltr_i_content.
+      CONTINUE.
+    ENDIF.
+  ENDLOOP.
   ENDMETHOD.
 
   METHOD delete.
-  ENDMETHOD.
+  LOOP AT keys ASSIGNING FIELD-SYMBOL(<key>).
+
+    SELECT SINGLE uuid
+      FROM zltr_content
+      WHERE uuid   = @<key>-uuid
+      INTO @DATA(lv_uuid).
+
+    IF sy-subrc <> 0.
+      APPEND VALUE #(
+        %tky = <key>-%tky
+        %msg = new_message_with_text(
+                 severity = if_abap_behv_message=>severity-error
+                 text     = 'Content record not found for delete' )
+      ) TO reported-zltr_i_content.
+      CONTINUE.
+    ENDIF.
+
+    APPEND VALUE #(
+      client = sy-mandt
+      uuid   = lv_uuid
+    ) TO lcl_buffer=>mt_content_delete.
+
+    APPEND VALUE #(
+      %tky = <key>-%tky
+    ) TO mapped-zltr_i_content.
+
+  ENDLOOP.
+ENDMETHOD.
 
   METHOD read.
+  LOOP AT keys ASSIGNING FIELD-SYMBOL(<key>).
+
+    SELECT SINGLE
+      uuid,
+      short_text,
+      long_text,
+      length
+    FROM zltr_content
+    WHERE uuid   = @<key>-uuid
+    INTO @DATA(ls_content).
+
+    IF sy-subrc = 0.
+      APPEND VALUE #(
+        uuid           = ls_content-uuid
+        shorttext      = ls_content-short_text
+        longtext       = ls_content-long_text
+        length         = ls_content-length
+        %tky           = <key>-%tky
+      ) TO result.
+    ELSE.
+      APPEND VALUE #(
+        %tky = <key>-%tky
+        %msg = new_message_with_text(
+                 severity = if_abap_behv_message=>severity-error
+                 text     = 'Content record not found' )
+      ) TO reported-zltr_i_content.
+    ENDIF.
+
+  ENDLOOP.
   ENDMETHOD.
 
   METHOD rba_Header.
-  ENDMETHOD.
+  LOOP AT keys_rba ASSIGNING FIELD-SYMBOL(<key>).
 
+    SELECT SINGLE uuid,
+                  object_type,
+                  object_key,
+                  text_type,
+                  language,
+                  created_by,
+                  created_at,
+                  changed_by,
+                  changed_at FROM zltr_head
+                             WHERE uuid = @<key>-uuid
+                             INTO @DATA(ls_head).
+    IF sy-subrc <> 0.
+      CONTINUE.
+    ENDIF.
+
+    APPEND VALUE #(
+      uuid       = ls_head-uuid
+      objecttype = ls_head-object_type
+      objectkey  = ls_head-object_key
+      texttype   = ls_head-text_type
+      language   = ls_head-language
+      createdby  = ls_head-created_by
+      createdat  = ls_head-created_at
+      changedby  = ls_head-changed_by
+      changedat  = ls_head-changed_at
+    ) TO result.
+
+    APPEND VALUE #(
+      source-%tky = <key>-%tky
+      target-%tky = VALUE #( uuid = ls_head-uuid )
+    ) TO association_links.
+
+  ENDLOOP.
+ENDMETHOD.
 ENDCLASS.
 
 CLASS lsc_ZLTR_I_HEAD DEFINITION INHERITING FROM cl_abap_behavior_saver.
@@ -282,10 +432,72 @@ CLASS lsc_ZLTR_I_HEAD IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD save.
-  ENDMETHOD.
+  " ---- HEAD CREATE ----
+  LOOP AT lcl_buffer=>mt_head_create ASSIGNING FIELD-SYMBOL(<head_create>).
+    INSERT zltr_head FROM @<head_create>.
+  ENDLOOP.
 
-  METHOD cleanup.
-  ENDMETHOD.
+  " ---- HEAD UPDATE ----
+  LOOP AT lcl_buffer=>mt_head_update ASSIGNING FIELD-SYMBOL(<head_update>).
+    UPDATE zltr_head FROM @<head_update>.
+  ENDLOOP.
+
+  " ---- HEAD DELETE ----
+  LOOP AT lcl_buffer=>mt_head_delete ASSIGNING FIELD-SYMBOL(<head_delete>).
+    DELETE FROM zltr_head
+      WHERE uuid   = @<head_delete>-uuid.
+    " Also delete corresponding content
+    DELETE FROM zltr_content
+      WHERE uuid   = @<head_delete>-uuid.
+  ENDLOOP.
+
+  " ---- CONTENT CREATE ----
+  LOOP AT lcl_buffer=>mt_content_create ASSIGNING FIELD-SYMBOL(<content_create>).
+    " Compress long text before saving
+    IF <content_create>-long_text IS NOT INITIAL.
+      TRY.
+          cl_abap_gzip=>compress_binary(
+            EXPORTING raw_in   = <content_create>-long_text
+            IMPORTING gzip_out = <content_create>-long_text ).
+        CATCH cx_parameter_invalid_range
+              cx_sy_buffer_overflow
+              cx_sy_compression_error.
+      ENDTRY.
+    ENDIF.
+    INSERT zltr_content FROM @<content_create>.
+  ENDLOOP.
+
+  " ---- CONTENT UPDATE ----
+  LOOP AT lcl_buffer=>mt_content_update ASSIGNING FIELD-SYMBOL(<content_update>).
+    IF <content_update>-long_text IS NOT INITIAL.
+      TRY.
+          cl_abap_gzip=>compress_binary(
+            EXPORTING raw_in   = <content_update>-long_text
+            IMPORTING gzip_out = <content_update>-long_text ).
+        CATCH cx_parameter_invalid_range
+              cx_sy_buffer_overflow
+              cx_sy_compression_error.
+      ENDTRY.
+    ENDIF.
+    UPDATE zltr_content FROM @<content_update>.
+  ENDLOOP.
+
+  " ---- CONTENT DELETE ----
+  LOOP AT lcl_buffer=>mt_content_delete ASSIGNING FIELD-SYMBOL(<content_delete>).
+    DELETE FROM zltr_content
+      WHERE uuid   = @<content_delete>-uuid.
+  ENDLOOP.
+
+ENDMETHOD.
+
+METHOD cleanup.
+  CLEAR lcl_buffer=>mt_head_create.
+  CLEAR lcl_buffer=>mt_head_update.
+  CLEAR lcl_buffer=>mt_head_delete.
+  CLEAR lcl_buffer=>mt_content_create.
+  CLEAR lcl_buffer=>mt_content_update.
+  CLEAR lcl_buffer=>mt_content_delete.
+ENDMETHOD.
 
   METHOD cleanup_finalize.
   ENDMETHOD.

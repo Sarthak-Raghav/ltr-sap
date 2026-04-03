@@ -1,5 +1,6 @@
 @AbapCatalog.viewEnhancementCategory: [#NONE]
 @EndUserText.label: 'LTR - Content Consumption View'
+@Metadata.allowExtensions: true
 @Metadata.ignorePropagatedAnnotations: true
 define view entity ZLTR_C_Content
   as projection on ZLTR_I_Content

@@ -1,11 +1,20 @@
 unmanaged implementation in class ZCL_LTR_HEADER_IMPL unique;
 strict ( 2 );
+with draft;
 
 define behavior for ZLTR_I_Head
+draft table Zltr_Head_d
 lock master
+total etag ChangedAt
 authorization master ( global )
 etag master ChangedAt
 {
+  draft action Edit;
+  draft action Activate;
+  draft action Discard;
+  draft action Resume;
+  draft determine action Prepare;
+
   field ( readonly ) UUID, CreatedBy, CreatedAt, ChangedBy, ChangedAt;
   field ( mandatory ) ObjectType, ObjectKey, TextType;
 
@@ -13,7 +22,7 @@ etag master ChangedAt
   update;
   delete;
 
-  association _Content { create; }
+  association _Content { create; with draft; }
 
   mapping for zltr_head
   {
@@ -30,6 +39,7 @@ etag master ChangedAt
 }
 
 define behavior for ZLTR_I_Content
+draft table ZLTR_Content_d
 lock dependent by _Header
 authorization dependent by _Header
 {

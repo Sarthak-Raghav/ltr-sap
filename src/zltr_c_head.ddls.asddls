@@ -1,5 +1,6 @@
 @AbapCatalog.viewEnhancementCategory: [#NONE]
 @AccessControl.authorizationCheck: #NOT_REQUIRED
+@Metadata.allowExtensions: true
 @EndUserText.label: 'LTR - Header Consumption View'
 @Metadata.ignorePropagatedAnnotations: true
 define root view entity ZLTR_C_Head

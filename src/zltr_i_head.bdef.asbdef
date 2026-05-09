@@ -47,7 +47,8 @@ draft table ZLTR_Content_d
 lock dependent by _Header
 authorization dependent by _Header
 {
-  field ( readonly ) UUID;
+  field ( numbering : managed, readonly ) UUID;
+  field ( readonly )HeadUUID;
 
   update;
   delete;
@@ -55,6 +56,7 @@ authorization dependent by _Header
   mapping for zltr_content
   {
     UUID            = uuid;
+    HeadUUID        = head_uuid;
     ShortText       = short_text;
     LongText        = long_text;
     length          = length;

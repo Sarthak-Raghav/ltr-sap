@@ -120,6 +120,7 @@ METHOD save_modified.
       DATA ls_content TYPE zltr_content.
       ls_content-client   = sy-mandt.
       ls_content-uuid     = <cc>-uuid.
+      ls_content-head_uuid  = <cc>-headuuid.
       ls_content-short_text = <cc>-shorttext.
       ls_content-length   = <cc>-length.
       ls_content-long_text = <cc>-longtext.
@@ -163,7 +164,7 @@ METHOD save_modified.
   " ---- CONTENT DELETE ----
   IF delete-zltr_i_content IS NOT INITIAL.
     LOOP AT delete-zltr_i_content ASSIGNING FIELD-SYMBOL(<cd>).
-      DELETE FROM zltr_content WHERE uuid = @<cd>-uuid.
+    DELETE FROM zltr_content WHERE head_uuid = @<hd>-uuid.
     ENDLOOP.
   ENDIF.
 

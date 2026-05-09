@@ -7,6 +7,7 @@ define view entity ZLTR_C_Content
   as projection on ZLTR_I_Content
 {
   key UUID,
+      HeadUUID, 
       ShortText,
       LongText,
       Length,

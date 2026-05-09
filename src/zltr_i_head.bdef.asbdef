@@ -13,7 +13,8 @@ etag master ChangedAt
   draft action Activate;
   draft action Discard;
   draft action Resume;
-  draft determine action Prepare;
+//  draft determine action Prepare;
+  draft determine action Prepare { validation check_unique; }
 
   field ( numbering : managed, readonly ) UUID;
   field ( readonly ) CreatedBy, CreatedAt, ChangedBy, ChangedAt;
@@ -22,6 +23,8 @@ etag master ChangedAt
   create;
   update;
   delete;
+
+  validation check_unique on save { create; }
 
  association _Content { create; with draft; }
 

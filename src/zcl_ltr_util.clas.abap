@@ -17,7 +17,7 @@ CLASS zcl_ltr_util DEFINITION
         changed_by  TYPE abp_lastchange_user,
         changed_at  TYPE abp_lastchange_tstmpl,
         short_text  TYPE zltr_short_text,
-        long_text   TYPE xstring,
+        long_text   TYPE string,
       END OF ty_text_entry.
 
     METHODS create_text
@@ -27,36 +27,45 @@ CLASS zcl_ltr_util DEFINITION
         iv_text_type   TYPE zltr_text_type
         iv_language    TYPE spras
         iv_short_text  TYPE zltr_short_text OPTIONAL
-        iv_long_text   TYPE xstring         OPTIONAL
+        iv_long_text   TYPE string          OPTIONAL
       RETURNING
-        VALUE(rv_uuid) TYPE sysuuid_x16.
+        VALUE(rv_uuid) TYPE sysuuid_x16
+      RAISING
+        zcx_ltr_util_error.
 
     METHODS read_text
       IMPORTING
         iv_uuid        TYPE sysuuid_x16
       RETURNING
-        VALUE(rs_text) TYPE ty_text_entry.
+        VALUE(rs_text) TYPE ty_text_entry
+      RAISING
+        zcx_ltr_util_error.
 
     METHODS update_text
       IMPORTING
         iv_uuid       TYPE sysuuid_x16
         iv_short_text TYPE zltr_short_text OPTIONAL
-        iv_long_text  TYPE xstring         OPTIONAL.
+        iv_long_text  TYPE string          OPTIONAL
+      RAISING
+        zcx_ltr_util_error.
 
     METHODS delete_text
       IMPORTING
-        iv_uuid TYPE sysuuid_x16.
+        iv_uuid TYPE sysuuid_x16
+      RAISING
+        zcx_ltr_util_error.
 
   PRIVATE SECTION.
-
 ENDCLASS.
 
 CLASS zcl_ltr_util IMPLEMENTATION.
 
   METHOD create_text.
 
+    DATA(lv_long_xstring) = cl_abap_conv_codepage=>create_out( )->convert( iv_long_text ).
+
     MODIFY ENTITIES OF zltr_i_head
-      ENTITY ZLTR_I_Head
+      ENTITY zltr_i_head
       CREATE FIELDS ( objecttype objectkey texttype language )
       WITH VALUE #( (
         %cid       = 'CID_HEAD'
@@ -65,18 +74,7 @@ CLASS zcl_ltr_util IMPLEMENTATION.
         texttype   = iv_text_type
         language   = iv_language
       ) )
-      MAPPED DATA(ls_mapped)
-      FAILED DATA(ls_failed)
-      REPORTED DATA(ls_reported).
-
-    IF ls_failed-zltr_i_head IS NOT INITIAL.
-      RETURN.
-    ENDIF.
-
-    rv_uuid = ls_mapped-zltr_i_head[ 1 ]-uuid.
-
-    MODIFY ENTITIES OF zltr_i_head
-      ENTITY ZLTR_I_Head
+      ENTITY zltr_i_head
       CREATE BY \_content
       FIELDS ( shorttext longtext length )
       WITH VALUE #( (
@@ -84,28 +82,35 @@ CLASS zcl_ltr_util IMPLEMENTATION.
         %target  = VALUE #( (
           %cid      = 'CID_CONTENT'
           shorttext = iv_short_text
-          longtext  = iv_long_text
-          length    = xstrlen( iv_long_text )
+          longtext  = lv_long_xstring
+          length    = xstrlen( lv_long_xstring )
         ) )
       ) )
-      FAILED DATA(ls_failed2)
-      REPORTED DATA(ls_reported2).
+      MAPPED DATA(ls_mapped)
+      FAILED DATA(ls_failed)
+      REPORTED DATA(ls_reported).
 
-    IF ls_failed2-zltr_i_content IS NOT INITIAL.
-      RETURN.
+    IF ls_failed-zltr_i_head IS NOT INITIAL.
+      RAISE EXCEPTION NEW zcx_ltr_util_error( iv_text = 'Create failed' ).
     ENDIF.
+
+    rv_uuid = ls_mapped-zltr_i_head[ 1 ]-uuid.
 
     COMMIT ENTITIES
       RESPONSE OF zltr_i_head
       FAILED DATA(ls_commit_failed)
       REPORTED DATA(ls_commit_reported).
 
+    IF ls_commit_failed IS NOT INITIAL.
+      RAISE EXCEPTION NEW zcx_ltr_util_error( iv_text = 'Commit failed' ).
+    ENDIF.
+
   ENDMETHOD.
 
   METHOD read_text.
 
     READ ENTITIES OF zltr_i_head
-      ENTITY ZLTR_I_Head
+      ENTITY zltr_i_head
       FIELDS ( objecttype objectkey texttype language createdby createdat changedby changedat )
       WITH VALUE #( ( uuid = iv_uuid ) )
       RESULT DATA(lt_head)
@@ -113,7 +118,7 @@ CLASS zcl_ltr_util IMPLEMENTATION.
       REPORTED DATA(ls_reported).
 
     IF ls_failed-zltr_i_head IS NOT INITIAL OR lt_head IS INITIAL.
-      RETURN.
+      RAISE EXCEPTION NEW zcx_ltr_util_error( iv_text = 'Record not found' ).
     ENDIF.
 
     rs_text-uuid        = lt_head[ 1 ]-uuid.
@@ -127,7 +132,7 @@ CLASS zcl_ltr_util IMPLEMENTATION.
     rs_text-changed_at  = lt_head[ 1 ]-changedat.
 
     READ ENTITIES OF zltr_i_head
-      ENTITY ZLTR_I_Head
+      ENTITY zltr_i_head
       BY \_content
       FIELDS ( shorttext longtext length )
       WITH VALUE #( ( uuid = iv_uuid ) )
@@ -137,16 +142,19 @@ CLASS zcl_ltr_util IMPLEMENTATION.
 
     IF lt_content IS NOT INITIAL.
       rs_text-short_text = lt_content[ 1 ]-shorttext.
-      rs_text-long_text  = lt_content[ 1 ]-longtext.
 
-      IF rs_text-long_text IS NOT INITIAL.
+      IF lt_content[ 1 ]-longtext IS NOT INITIAL.
         TRY.
+            DATA lv_decompressed TYPE xstring.
             cl_abap_gzip=>decompress_binary(
-              EXPORTING gzip_in = rs_text-long_text
-              IMPORTING raw_out = rs_text-long_text ).
+              EXPORTING gzip_in = lt_content[ 1 ]-longtext
+              IMPORTING raw_out = lv_decompressed ).
+            rs_text-long_text = cl_abap_conv_codepage=>create_in( )->convert( lv_decompressed ).
           CATCH cx_parameter_invalid_range
                 cx_sy_buffer_overflow
-                cx_sy_compression_error.
+                cx_sy_compression_error
+                cx_sy_conversion_codepage.
+            RAISE EXCEPTION NEW zcx_ltr_util_error( iv_text = 'Decompression failed' ).
         ENDTRY.
       ENDIF.
     ENDIF.
@@ -155,20 +163,22 @@ CLASS zcl_ltr_util IMPLEMENTATION.
 
   METHOD update_text.
 
+    DATA(lv_long_xstring) = cl_abap_conv_codepage=>create_out( )->convert( iv_long_text ).
+
     MODIFY ENTITIES OF zltr_i_head
-      ENTITY ZLTR_I_Content
+      ENTITY zltr_i_content
       UPDATE FIELDS ( shorttext longtext length )
       WITH VALUE #( (
         %tky      = VALUE #( uuid = iv_uuid )
         shorttext = iv_short_text
-        longtext  = iv_long_text
-        length    = xstrlen( iv_long_text )
+        longtext  = lv_long_xstring
+        length    = xstrlen( lv_long_xstring )
       ) )
       FAILED DATA(ls_failed)
       REPORTED DATA(ls_reported).
 
     IF ls_failed-zltr_i_content IS NOT INITIAL.
-      RETURN.
+      RAISE EXCEPTION NEW zcx_ltr_util_error( iv_text = 'Update failed' ).
     ENDIF.
 
     COMMIT ENTITIES
@@ -176,12 +186,16 @@ CLASS zcl_ltr_util IMPLEMENTATION.
       FAILED DATA(ls_commit_failed)
       REPORTED DATA(ls_commit_reported).
 
+    IF ls_commit_failed IS NOT INITIAL.
+      RAISE EXCEPTION NEW zcx_ltr_util_error( iv_text = 'Commit failed' ).
+    ENDIF.
+
   ENDMETHOD.
 
   METHOD delete_text.
 
     MODIFY ENTITIES OF zltr_i_head
-      ENTITY ZLTR_I_Head
+      ENTITY zltr_i_head
       DELETE FROM VALUE #( (
         %tky = VALUE #( uuid = iv_uuid )
       ) )
@@ -189,13 +203,17 @@ CLASS zcl_ltr_util IMPLEMENTATION.
       REPORTED DATA(ls_reported).
 
     IF ls_failed-zltr_i_head IS NOT INITIAL.
-      RETURN.
+      RAISE EXCEPTION NEW zcx_ltr_util_error( iv_text = 'Delete failed' ).
     ENDIF.
 
     COMMIT ENTITIES
       RESPONSE OF zltr_i_head
       FAILED DATA(ls_commit_failed)
       REPORTED DATA(ls_commit_reported).
+
+    IF ls_commit_failed IS NOT INITIAL.
+      RAISE EXCEPTION NEW zcx_ltr_util_error( iv_text = 'Commit failed' ).
+    ENDIF.
 
   ENDMETHOD.
 

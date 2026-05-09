@@ -3,12 +3,56 @@ CLASS lhc_ZLTR_I_Head DEFINITION INHERITING FROM cl_abap_behavior_handler.
 
     METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
       IMPORTING REQUEST requested_authorizations FOR ZLTR_I_Head RESULT result.
+    METHODS check_unique FOR VALIDATE ON SAVE
+      IMPORTING keys FOR ZLTR_I_Head~check_unique.
 
 ENDCLASS.
 
 CLASS lhc_ZLTR_I_Head IMPLEMENTATION.
 
   METHOD get_global_authorizations.
+  ENDMETHOD.
+
+  METHOD check_unique.
+   LOOP AT keys ASSIGNING FIELD-SYMBOL(<key>).
+
+    " Read the entity being created
+    READ ENTITIES OF zltr_i_head IN LOCAL MODE
+      ENTITY ZLTR_I_Head
+      FIELDS ( objecttype objectkey texttype language )
+      WITH VALUE #( ( %tky = <key>-%tky ) )
+      RESULT DATA(lt_head)
+      FAILED DATA(ls_failed)
+      REPORTED DATA(ls_reported).
+
+    CHECK lt_head IS NOT INITIAL.
+
+    DATA(ls_head) = lt_head[ 1 ].
+
+    " Check for existing record with same combination
+    SELECT SINGLE uuid
+      FROM zltr_head
+      WHERE object_type = @ls_head-objecttype
+      AND   object_key  = @ls_head-objectkey
+      AND   text_type   = @ls_head-texttype
+      AND   language    = @ls_head-language
+      AND   uuid        <> @ls_head-uuid
+      INTO @DATA(lv_existing).
+
+    IF sy-subrc = 0.
+      APPEND VALUE #(
+        %tky = <key>-%tky
+        %msg = new_message_with_text(
+                 severity = if_abap_behv_message=>severity-error
+                 text     = 'A text entry for this object type, key, text type and language already exists' )
+      ) TO reported-zltr_i_head.
+
+      APPEND VALUE #(
+        %tky = <key>-%tky
+      ) TO failed-zltr_i_head.
+    ENDIF.
+
+  ENDLOOP.
   ENDMETHOD.
 
 ENDCLASS.
